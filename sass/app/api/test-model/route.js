@@ -2,27 +2,28 @@
 import { NextResponse } from 'next/server';
 import { deepSeekService } from '@/lib/ai/modelService';
 
-export async function GET() {
+// We need to explicitly export the POST method
+export async function POST(request) {
   try {
-    // Test the model with a simple F1-related query
-    const testQuery = "What are the key components of a Formula 1 car?";
+    const { query } = await request.json();
     
-    console.log('Initiating model test...');
-    const response = await deepSeekService.queryModel(testQuery);
-    
+    // Log the incoming request for debugging
+    console.log('Test endpoint received query:', query);
+
+    const response = await deepSeekService.queryModel(query);
+    console.log('Model response:', response);
+
     return NextResponse.json({
       status: 'success',
       response: response,
-      message: 'Model connection successful',
-      timestamp: new Date().toISOString()
+      message: 'Model is working correctly'
     });
   } catch (error) {
-    console.error('Model test failed:', error);
+    console.error('Test endpoint error:', error);
     return NextResponse.json(
       { 
         status: 'error',
-        message: error.message,
-        timestamp: new Date().toISOString()
+        message: error.message 
       },
       { status: 500 }
     );
