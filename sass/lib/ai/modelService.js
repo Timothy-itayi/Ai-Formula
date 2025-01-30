@@ -5,104 +5,120 @@ import fs from 'fs/promises';
 
 class DeepSeekService {
   constructor() {
-    // Configure the service to use your specific llama-simple-chat setup
+    // Store the command you normally use to run the model
     this.modelConfig = {
-      // Path to the llama.cpp build directory containing the executable
-      llamaBuildPath: '/Users/user/Desktop/llama.cpp/build/bin',
-      // Path to the model file
-      modelPath: '/Users/user/Desktop/llama.cpp/models/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
-      // Specific parameters matching your alias configuration
+      command: './build/bin/llama-simple-chat',
+      workingDirectory: '/Users/user/Desktop/llama.cpp',
+      modelPath: './models/DeepSeek-R1-Distill-Qwen-1.5B-Q4_K_M.gguf',
       parameters: {
         contextSize: 4096,
-        ngl: 0  // GPU layers parameter from your configuration
+        ngl: 0
       }
     };
   }
 
   async queryModel(userQuery) {
     try {
-      // Construct the path to llama-simple-chat executable
-      const executablePath = path.join(this.modelConfig.llamaBuildPath, 'llama-simple-chat');
-      
-      // Log the command we're about to execute to help with debugging
-      console.log('Executing model with:', {
-        executable: executablePath,
-        model: this.modelConfig.modelPath,
-        contextSize: this.modelConfig.parameters.contextSize,
-        ngl: this.modelConfig.parameters.ngl
+      // Log the current working directory and command
+      console.log('Executing model with configuration:', {
+        workingDir: this.modelConfig.workingDirectory,
+        command: this.modelConfig.command,
+        modelPath: this.modelConfig.modelPath
       });
 
-      // Spawn the process using llama-simple-chat with your configuration
-      const llamaProcess = spawn(executablePath, [
-        '-m', this.modelConfig.modelPath,
-        '-c', this.modelConfig.parameters.contextSize,
-        '-ngl', this.modelConfig.parameters.ngl,
-        '--prompt', this.buildF1Prompt(userQuery)
-      ]);
+      // Create the model process using your existing command structure
+      const modelProcess = spawn(
+        this.modelConfig.command,
+        [
+          '-m', this.modelConfig.modelPath,
+          '-c', this.modelConfig.parameters.contextSize,
+          '-ngl', this.modelConfig.parameters.ngl
+        ],
+        {
+          cwd: this.modelConfig.workingDirectory, // Set working directory to llama.cpp folder
+          shell: true // This might be needed for the command to work properly
+        }
+      );
 
       return new Promise((resolve, reject) => {
         let response = '';
-        let error = '';
+        let errorOutput = '';
 
-        // Capture the model's output
-        llamaProcess.stdout.on('data', (data) => {
-          const output = data.toString();
-          console.log('Model output:', output);
-          response += output;
+        modelProcess.stdout.on('data', (data) => {
+          console.log('Model output:', data.toString());
+          response += data.toString();
         });
 
-        // Capture any errors
-        llamaProcess.stderr.on('data', (data) => {
-          const errorOutput = data.toString();
-          console.error('Model error:', errorOutput);
-          error += errorOutput;
+        modelProcess.stderr.on('data', (data) => {
+          console.error('Model error output:', data.toString());
+          errorOutput += data.toString();
         });
 
-        // Handle process completion
-        llamaProcess.on('close', (code) => {
+        modelProcess.on('close', (code) => {
+          console.log(`Model process exited with code ${code}`);
           if (code === 0) {
-            resolve(this.processResponse(response));
+            resolve({
+              answer: response.trim(),
+              timestamp: new Date().toISOString()
+            });
           } else {
-            reject(new Error(`Model process failed with code ${code}. Error: ${error}`));
+            reject(new Error(`Model process failed with code ${code}. Error: ${errorOutput}`));
           }
         });
 
-        // Handle any process errors
-        llamaProcess.on('error', (err) => {
-          reject(new Error(`Failed to start model process: ${err.message}`));
+        modelProcess.on('error', (error) => {
+          console.error('Failed to start model process:', error);
+          reject(error);
         });
+
+        // Send the query to the model
+        modelProcess.stdin.write(userQuery + '\n');
+        modelProcess.stdin.end();
       });
     } catch (error) {
-      console.error('Error in model query:', error);
+      console.error('Error in model execution:', error);
       throw error;
     }
   }
 
-  buildF1Prompt(userQuery) {
-    // Create a conversation-style prompt that matches llama-simple-chat's format
-    return `You are an F1 expert assistant. Please help with the following query about Formula 1:
-${userQuery}`;
-  }
+  async validateEnvironment() {
+    try {
+      // Check if we can access the working directory
+      await fs.access(this.modelConfig.workingDirectory);
+      
+      // Check if we can access the model file
+      const modelFullPath = path.join(
+        this.modelConfig.workingDirectory,
+        this.modelConfig.modelPath
+      );
+      await fs.access(modelFullPath);
 
-  processResponse(response) {
-    // Clean up and structure the model's response
-    return {
-      answer: this.cleanResponse(response),
-      timestamp: new Date().toISOString(),
-      model: 'DeepSeek-1.5B',
-      metadata: {
-        processedAt: new Date().toISOString(),
-        modelVersion: 'R1-Distill-Qwen-1.5B'
-      }
-    };
-  }
+      // Check if we can access the executable
+      const executablePath = path.join(
+        this.modelConfig.workingDirectory,
+        this.modelConfig.command
+      );
+      await fs.access(executablePath);
 
-  cleanResponse(response) {
-    // Remove any system prompts or artifacts from the response
-    // This method can be expanded based on the actual output format
-    return response.trim().replace(/^Assistant: /, '');
+      return true;
+    } catch (error) {
+      console.error('Environment validation failed:', error);
+      return false;
+    }
   }
 }
 
-// Export a singleton instance of the service
-export const deepSeekService = new DeepSeekService();
+// Create and validate the service before exporting
+const deepSeekService = new DeepSeekService();
+
+// Immediately validate the environment
+deepSeekService.validateEnvironment()
+  .then(isValid => {
+    if (!isValid) {
+      console.error('DeepSeek service environment validation failed');
+    } else {
+      console.log('DeepSeek service environment validated successfully');
+    }
+  });
+
+export { deepSeekService };

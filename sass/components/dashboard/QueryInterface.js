@@ -12,41 +12,41 @@ const QueryInterface = () => {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!query.trim()) return
-    
-    setIsLoading(true)
-    setError(null) // Clear any previous errors
 
-    try {
-      const res = await fetch('/api/query', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query })
-      })
+// components/dashboard/QueryInterface.js
+async function handleSubmit(e) {
+  e.preventDefault()
+  if (!query.trim()) return
+  
+  setIsLoading(true)
+  setError(null)
 
-      const data = await res.json()
+  try {
+    // Make a direct query without the test step
+    const res = await fetch('/api/query', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query })
+    });
 
-      // Handle error responses
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to get response')
-      }
+    const data = await res.json();
 
-      // Handle successful response
-      setResponse(data)
-      
-      // Optionally clear the input after successful query
-      // setQuery('')
-      
-    } catch (error) {
-      console.error('Error querying model:', error)
-      setError(error.message)
-      setResponse(null)
-    } finally {
-      setIsLoading(false)
+    // Log the response for debugging
+    console.log('Response from API:', data);
+
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to get response');
     }
+
+    setResponse(data);
+  } catch (error) {
+    console.error('Error querying model:', error);
+    setError(error.message);
+    setResponse(null);
+  } finally {
+    setIsLoading(false);
   }
+}
 
   return (
     <div className="space-y-4">
