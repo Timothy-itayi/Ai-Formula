@@ -1,52 +1,64 @@
 // components/dashboard/QueryInterface.js
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { BrainCircuit, AlertCircle } from 'lucide-react'
 
 const QueryInterface = () => {
   const [query, setQuery] = useState('')
-  const [response, setResponse] = useState(null)
+  const [output, setOutput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
+  const outputRef = useRef(null)
 
-
-// components/dashboard/QueryInterface.js
-async function handleSubmit(e) {
-  e.preventDefault()
-  if (!query.trim()) return
-  
-  setIsLoading(true)
-  setError(null)
-
-  try {
-    // Make a direct query without the test step
-    const res = await fetch('/api/query', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query })
-    });
-
-    const data = await res.json();
-
-    // Log the response for debugging
-    console.log('Response from API:', data);
-
-    if (!res.ok) {
-      throw new Error(data.error || 'Failed to get response');
+  // Auto-scroll to bottom when new content is added
+  useEffect(() => {
+    if (outputRef.current) {
+      outputRef.current.scrollTop = outputRef.current.scrollHeight;
     }
+  }, [output]);
 
-    setResponse(data);
-  } catch (error) {
-    console.error('Error querying model:', error);
-    setError(error.message);
-    setResponse(null);
-  } finally {
-    setIsLoading(false);
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!query.trim()) return
+    
+    setIsLoading(true)
+    setOutput('')
+    setError(null)
+
+    try {
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query })
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // Get a reader from the response body stream
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      // Read the stream
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        // Decode the chunk and append to output
+        const text = decoder.decode(value);
+        setOutput(prev => prev + text);
+      }
+    } catch (error) {
+      console.error('Error querying model:', error);
+      setError(error.message);
+    } finally {
+      setIsLoading(false);
+    }
   }
-}
 
   return (
     <div className="space-y-4">
@@ -91,18 +103,25 @@ async function handleSubmit(e) {
         </div>
       )}
 
-      {/* Response Display */}
-      {response && (
+      {/* Output Display */}
+      {(output || isLoading) && (
         <div className="mt-6 space-y-4">
-          <div className="p-4 bg-gray-50 rounded-lg border">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
+          <div 
+            ref={outputRef}
+            className="p-4 bg-black rounded-lg border font-mono text-sm text-white"
+          >
+            <h3 className="font-semibold mb-2 flex items-center gap-2 text-white">
               <BrainCircuit className="w-4 h-4" />
               AI Response
             </h3>
-            <p className="text-sm whitespace-pre-wrap">{response.answer}</p>
-            <div className="mt-2 text-xs text-gray-500">
-              Generated at: {new Date(response.timestamp).toLocaleString()}
+            <div className="whitespace-pre-wrap min-h-[100px] max-h-[500px] overflow-y-auto">
+              {output || 'Thinking...'}
             </div>
+            {output && (
+              <div className="mt-2 text-xs text-gray-400">
+                Generated at: {new Date().toLocaleString()}
+              </div>
+            )}
           </div>
         </div>
       )}
