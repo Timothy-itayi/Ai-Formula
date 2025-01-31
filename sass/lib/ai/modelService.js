@@ -41,45 +41,64 @@ class DeepSeekService {
       );
 
       return new Promise((resolve, reject) => {
-        let response = '';
+        let buffer = '';
+        let responseChunks = [];
         let errorOutput = '';
 
+
         modelProcess.stdout.on('data', (data) => {
-          console.log('Model output:', data.toString());
-          response += data.toString();
-        });
-
-        modelProcess.stderr.on('data', (data) => {
-          console.error('Model error output:', data.toString());
-          errorOutput += data.toString();
-        });
-
-        modelProcess.on('close', (code) => {
-          console.log(`Model process exited with code ${code}`);
-          if (code === 0) {
-            resolve({
-              answer: response.trim(),
-              timestamp: new Date().toISOString()
-            });
-          } else {
-            reject(new Error(`Model process failed with code ${code}. Error: ${errorOutput}`));
+          // Add new data to buffer
+          buffer += data.toString();
+  
+          // Look for natural breaking points (end of sentences or paragraphs)
+          if (buffer.includes('\n') || buffer.includes('. ') || buffer.length > 100) {
+            // Process the buffer
+            const chunk = buffer.trim();
+            if (chunk) {
+              console.log('Processed chunk:', chunk);
+              responseChunks.push(chunk);
+            }
+            buffer = ''; // Clear the buffer
           }
         });
-
-        modelProcess.on('error', (error) => {
-          console.error('Failed to start model process:', error);
-          reject(error);
-        });
-
-        // Send the query to the model
-        modelProcess.stdin.write(userQuery + '\n');
-        modelProcess.stdin.end();
+  
+  modelProcess.stderr.on('data', (data) => {
+        console.error('Model error output:', data.toString());
+        errorOutput += data.toString();
       });
-    } catch (error) {
-      console.error('Error in model execution:', error);
-      throw error;
-    }
+
+      modelProcess.on('close', (code) => {
+        console.log(`Model process exited with code ${code}`);
+        
+        // Process any remaining buffer content
+        if (buffer.trim()) {
+          responseChunks.push(buffer.trim());
+        }
+
+        if (code === 0) {
+          resolve({
+            answer: responseChunks.join(' '),
+            timestamp: new Date().toISOString()
+          });
+        } else {
+          reject(new Error(`Model process failed with code ${code}. Error: ${errorOutput}`));
+        }
+      });
+
+      modelProcess.on('error', (error) => {
+        console.error('Failed to start model process:', error);
+        reject(error);
+      });
+
+      // Send the query to the model
+      modelProcess.stdin.write(userQuery + '\n');
+      modelProcess.stdin.end();
+    });
+  } catch (error) {
+    console.error('Error in model execution:', error);
+    throw error;
   }
+}
 
   async validateEnvironment() {
     try {
