@@ -20,9 +20,17 @@ const QueryInterface = () => {
     }
   }, [output]);
 
-  async function handleSubmit(e) {
-    e.preventDefault()
-    if (!query.trim()) return
+
+
+  async function onFormSubmit(e) {
+  
+      e.preventDefault()
+  
+ 
+    if (!query.trim())
+    
+      
+      return
     
     setIsLoading(true)
     setOutput('')
@@ -60,9 +68,18 @@ const QueryInterface = () => {
     }
   }
 
+ // Separate handler for keyboard events
+ const handleKeyPress = (e) => {
+  // Only submit if it's Enter without Shift (allows Shift+Enter for new lines)
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault(); // Prevent default Enter behavior
+    onFormSubmit(e); // Call the form submission handler
+  }
+};
+
   return (
     <div className="space-y-4">
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={onFormSubmit} className="space-y-4">
         <div className="flex flex-col space-y-2">
           <div className="flex items-center space-x-2">
             <BrainCircuit className="w-5 h-5 text-blue-500" />
@@ -72,6 +89,7 @@ const QueryInterface = () => {
           </div>
           <textarea
             value={query}
+            onKeyDown={handleKeyPress}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full p-3 border rounded-lg min-h-[100px] resize-none text-black"
             placeholder="E.g., What were the most exciting races of the 2023 season?"
