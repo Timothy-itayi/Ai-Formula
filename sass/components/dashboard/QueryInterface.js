@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+
 import { BrainCircuit, AlertCircle } from 'lucide-react'
 
 const QueryInterface = () => {
@@ -84,7 +84,7 @@ const QueryInterface = () => {
           <div className="flex items-center space-x-2">
             <BrainCircuit className="w-5 h-5 text-blue-500" />
             <label className="text-sm font-medium">
-              Ask anything about Formula 1
+              Ask anything
             </label>
           </div>
           <textarea
@@ -92,7 +92,7 @@ const QueryInterface = () => {
             onKeyDown={handleKeyPress}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full p-3 border rounded-lg min-h-[100px] resize-none text-black"
-            placeholder="E.g., What were the most exciting races of the 2023 season?"
+            placeholder="Hello how can I help you today?"
             disabled={isLoading}
           />
         </div>
